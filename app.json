@@ -14,9 +14,14 @@
       "backgroundColor": "#0B1220"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.darveaujp.bloodpressurejournal",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.darveaujp.bloodpressurejournal",
       "statusBar": {
         "backgroundColor": "#0B1220",
         "barStyle": "light-content"
@@ -35,6 +40,12 @@
     "plugins": [
       "expo-router",
       "expo-sqlite"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9030fa52-0ccc-49b7-87b8-073319a69f4a"
+      }
+    }
   }
 }

@@ -136,8 +136,8 @@ export default function TrendsScreen() {
     const width = Dimensions.get('window').width;
     const chartWidth = Math.max(280, Math.floor(width - 40));
 
-    const startAt = rangeStart.getTime();
-    const endAt = rangeEnd.getTime();
+    const startAt = new Date(rangeStart).setHours(0, 0, 0, 0);
+    const endAt = new Date(rangeEnd).setHours(23, 59, 59, 999);
     const sorted = [...groups]
       .filter((g) => g.createdAt >= startAt && g.createdAt <= endAt)
       .sort((a, b) => a.createdAt - b.createdAt);

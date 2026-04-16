@@ -40,10 +40,13 @@ export default function AddScreen() {
 
   const [note, setNote] = useState('');
   const [rows, setRows] = useState<Row[]>([{ systolic: '', diastolic: '', pulse: '' }]);
-  const [groupDate, setGroupDate] = useState<Date>(new Date());
+  const [arm, setArm] = useState<'left' | 'right'>('left');
+
+  // Advanced: backdate
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [customDate, setCustomDate] = useState<Date | null>(null);
   const [dateModalOpen, setDateModalOpen] = useState(false);
   const [draftDate, setDraftDate] = useState<Date | null>(null);
-  const [arm, setArm] = useState<'left' | 'right'>('left');
 
   const parsed = useMemo(() => {
     const readings: Array<Omit<BpReadingInput, 'takenAt'>> = [];
@@ -103,12 +106,13 @@ export default function AddScreen() {
         arm,
         note: note.trim() ? note.trim() : null,
         readings: parsed.readings,
-        createdAt: groupDate.getTime(),
+        createdAt: customDate ? customDate.getTime() : Date.now(),
       });
       setNote('');
       setRows([{ systolic: '', diastolic: '', pulse: '' }]);
-      setDateModalOpen(false);
       setArm('left');
+      setAdvancedOpen(false);
+      setCustomDate(null);
       toast.show('Reading saved.', { type: 'success' });
     } catch (e: any) {
       toast.show(e?.message ? String(e.message) : 'Unknown error', { type: 'danger' });
@@ -132,98 +136,6 @@ export default function AddScreen() {
           <Text style={styles.subtitle}>Enter one or more measurements. Saved as a single averaged result.</Text>
 
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Date & time</Text>
-          <View style={styles.dateRow}>
-            <TouchableOpacity
-              onPress={() => {
-                setDraftDate(new Date(groupDate));
-                setDateModalOpen(true);
-              }}
-              style={styles.dateButton}
-            >
-              <Text style={styles.dateButtonText}>
-                {groupDate.toLocaleDateString()}
-              </Text>
-            </TouchableOpacity>
-            <TimePickerField value={groupDate} onChange={setGroupDate} />
-          </View>
-        </View>
-
-        <Modal
-          visible={dateModalOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setDateModalOpen(false)}
-        >
-          <View style={styles.modalBackdrop}>
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setDateModalOpen(false)} />
-            <View style={styles.modalCard}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select date</Text>
-                <TouchableOpacity onPress={() => setDateModalOpen(false)} style={styles.iconButton}>
-                  <Ionicons name="close" size={18} color="#CBD5E1" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.calendarWrap}>
-                <Calendar
-                  enableSwipeMonths
-                  style={styles.calendar}
-                  markedDates={
-                    draftDate
-                      ? {
-                          [draftDate.toISOString().slice(0, 10)]: {
-                            selected: true,
-                            selectedColor: 'rgba(96, 165, 250, 0.35)',
-                            selectedTextColor: '#F8FAFC',
-                          },
-                        }
-                      : {}
-                  }
-                  theme={{
-                    backgroundColor: '#111B2E',
-                    calendarBackground: '#111B2E',
-                    monthTextColor: '#F8FAFC',
-                    dayTextColor: '#CBD5E1',
-                    textDisabledColor: '#334155',
-                    arrowColor: '#CBD5E1',
-                    todayTextColor: '#60A5FA',
-                  }}
-                  onDayPress={(day: { dateString: string }) => {
-                    setDraftDate(new Date(`${day.dateString}T00:00:00`));
-                  }}
-                />
-              </View>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.secondaryPill}
-                  onPress={() => {
-                    setDraftDate(new Date());
-                  }}
-                >
-                  <Text style={styles.secondaryPillText}>Today</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.primaryPill}
-                  onPress={() => {
-                    if (!draftDate) return;
-                    setGroupDate((prev) => {
-                      const next = new Date(prev);
-                      next.setFullYear(draftDate.getFullYear(), draftDate.getMonth(), draftDate.getDate());
-                      return next;
-                    });
-                    setDateModalOpen(false);
-                  }}
-                >
-                  <Text style={styles.primaryPillText}>Apply</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-
-        <View style={styles.card}>
           <Text style={styles.cardTitle}>Arm</Text>
           <View style={styles.armRow}>
             <TouchableOpacity
@@ -245,17 +157,6 @@ export default function AddScreen() {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Optional note</Text>
-          <TextInput
-            value={note}
-            onChangeText={setNote}
-            placeholder="e.g., Morning, after coffee"
-            placeholderTextColor="#64748B"
-            style={styles.input}
-          />
         </View>
 
         <View style={styles.card}>
@@ -324,17 +225,150 @@ export default function AddScreen() {
         </View>
 
         <View style={styles.card}>
+          <Text style={styles.cardTitle}>Optional note</Text>
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            placeholder="e.g., Morning, after coffee"
+            placeholderTextColor="#64748B"
+            style={styles.input}
+          />
+        </View>
+
+        <View style={styles.card}>
           <Text style={styles.cardTitle}>Average preview</Text>
           {parsed.avg ? (
             <Text style={styles.avgText}>
               {Math.round(parsed.avg.systolic)}/{Math.round(parsed.avg.diastolic)}
               {parsed.avg.pulse ? `  •  Pulse ${Math.round(parsed.avg.pulse)}` : ''}
-              {`  •  n=${parsed.readings.length}`}
             </Text>
           ) : (
             <Text style={styles.muted}>Enter at least one valid row.</Text>
           )}
         </View>
+
+        <View style={styles.card}>
+          <TouchableOpacity
+            onPress={() => setAdvancedOpen((v) => !v)}
+            style={styles.collapseHeader}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.cardTitle}>Advanced</Text>
+            <Ionicons
+              name={advancedOpen ? 'chevron-up' : 'chevron-down'}
+              size={20}
+              color="#CBD5E1"
+            />
+          </TouchableOpacity>
+
+          {advancedOpen ? (
+            <>
+              <Text style={styles.muted}>Set a custom date and time for this reading.</Text>
+              <View style={styles.dateRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setDraftDate(customDate ?? new Date());
+                    setDateModalOpen(true);
+                  }}
+                  style={styles.dateButton}
+                >
+                  <Text style={styles.dateButtonText}>
+                    {customDate ? customDate.toLocaleDateString() : 'Select date'}
+                  </Text>
+                </TouchableOpacity>
+                <TimePickerField
+                  value={customDate ?? new Date()}
+                  onChange={(next) => {
+                    setCustomDate((prev) => {
+                      const base = prev ?? new Date();
+                      const updated = new Date(base);
+                      updated.setHours(next.getHours(), next.getMinutes(), 0, 0);
+                      return updated;
+                    });
+                  }}
+                />
+              </View>
+              {customDate ? (
+                <TouchableOpacity onPress={() => setCustomDate(null)}>
+                  <Text style={styles.clearText}>Clear custom date (use current time)</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          ) : null}
+        </View>
+
+        <Modal
+          visible={dateModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setDateModalOpen(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setDateModalOpen(false)} />
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select date</Text>
+                <TouchableOpacity onPress={() => setDateModalOpen(false)} style={styles.iconButton}>
+                  <Ionicons name="close" size={18} color="#CBD5E1" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.calendarWrap}>
+                <Calendar
+                  enableSwipeMonths
+                  style={styles.calendar}
+                  markedDates={
+                    draftDate
+                      ? {
+                          [draftDate.toISOString().slice(0, 10)]: {
+                            selected: true,
+                            selectedColor: 'rgba(96, 165, 250, 0.35)',
+                            selectedTextColor: '#F8FAFC',
+                          },
+                        }
+                      : {}
+                  }
+                  theme={{
+                    backgroundColor: '#111B2E',
+                    calendarBackground: '#111B2E',
+                    monthTextColor: '#F8FAFC',
+                    dayTextColor: '#CBD5E1',
+                    textDisabledColor: '#334155',
+                    arrowColor: '#CBD5E1',
+                    todayTextColor: '#60A5FA',
+                  }}
+                  onDayPress={(day: { dateString: string }) => {
+                    setDraftDate(new Date(`${day.dateString}T00:00:00`));
+                  }}
+                />
+              </View>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.secondaryPill}
+                  onPress={() => setDraftDate(new Date())}
+                >
+                  <Text style={styles.secondaryPillText}>Today</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.primaryPill}
+                  onPress={() => {
+                    if (!draftDate) return;
+                    setCustomDate((prev) => {
+                      const base = prev ?? new Date();
+                      const next = new Date(base);
+                      next.setFullYear(draftDate.getFullYear(), draftDate.getMonth(), draftDate.getDate());
+                      return next;
+                    });
+                    setDateModalOpen(false);
+                  }}
+                >
+                  <Text style={styles.primaryPillText}>Apply</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         <TouchableOpacity onPress={onSave} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>Save reading</Text>
@@ -397,26 +431,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  dateButton: {
-    flex: 1,
-    backgroundColor: '#0B1220',
-    borderColor: '#1E293B',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateButtonText: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '700',
   },
   armRow: {
     flexDirection: 'row',
@@ -504,6 +518,36 @@ const styles = StyleSheet.create({
     color: '#052E16',
     fontWeight: '900',
     fontSize: 16,
+  },
+  collapseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  dateButton: {
+    flex: 1,
+    backgroundColor: '#0B1220',
+    borderColor: '#1E293B',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateButtonText: {
+    color: '#F8FAFC',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  clearText: {
+    color: '#60A5FA',
+    fontSize: 13,
+    fontWeight: '700',
   },
   modalBackdrop: {
     flex: 1,

@@ -58,6 +58,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
+    gap: 12,
   },
   text: {
     color: '#F8FAFC',

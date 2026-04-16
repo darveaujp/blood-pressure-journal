@@ -6,22 +6,54 @@ import {
   EncodingType,
 } from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 import { format } from 'date-fns';
 import { useBpStore } from '../state/bpStore';
 import { useSettingsStore } from '../state/settingsStore';
+import { listAllGroups, getGroupWithReadings, deleteAllGroups } from '../db/bpRepository';
 
 export type BackupData = {
   version: '1.0';
   exportedAt: number;
-  groups: ReturnType<typeof useBpStore.getState>['groups'];
+  groups: Array<{
+    id: string;
+    createdAt: number;
+    arm: 'left' | 'right';
+    note: string | null;
+    readings: Array<{
+      systolic: number;
+      diastolic: number;
+      pulse: number | null;
+    }>;
+  }>;
 };
 
 export async function createBackupData(): Promise<BackupData> {
-  const groups = useBpStore.getState().groups;
+  // Query DB directly with no limit to ensure ALL groups are backed up
+  const groups = await listAllGroups();
+  
+  // Fetch full group data with readings
+  const groupsWithReadings = await Promise.all(
+    groups.map(async (group) => {
+      const fullGroup = await getGroupWithReadings(group.id);
+      return {
+        id: group.id,
+        createdAt: group.createdAt,
+        arm: group.arm,
+        note: group.note,
+        readings: fullGroup?.readings.map(r => ({
+          systolic: r.systolic,
+          diastolic: r.diastolic,
+          pulse: r.pulse,
+        })) || [],
+      };
+    })
+  );
+  
   return {
     version: '1.0',
     exportedAt: Date.now(),
-    groups,
+    groups: groupsWithReadings,
   };
 }
 
@@ -66,36 +98,18 @@ export async function shareBackupFile(uri: string): Promise<void> {
   
   await Sharing.shareAsync(uri, {
     mimeType: 'application/json',
-    dialogTitle: 'Save Backup to Google Drive',
+    dialogTitle: 'Save Backup',
     UTI: 'public.json',
   });
 }
 
 export async function autoBackupIfEnabled(): Promise<void> {
-  const { autoBackupEnabled, googleDriveConnected, googleAccessToken, setLastBackupAt } = useSettingsStore.getState();
+  const { autoBackupEnabled, setLastBackupAt } = useSettingsStore.getState();
   
   if (!autoBackupEnabled) return;
   
   try {
-    // Use consistent filename for auto-backup
-    const uri = await exportBackupToJsonConsistent();
-    
-    if (googleDriveConnected && googleAccessToken) {
-      // Import and use Google Drive upload
-      const { uploadToGoogleDrive } = await import('./googleDriveService');
-      try {
-        await uploadToGoogleDrive(
-          googleAccessToken,
-          uri,
-          'bp_backup_latest.json'
-        );
-        console.log('Auto-backup uploaded to Google Drive');
-      } catch (uploadError) {
-        console.error('Google Drive upload failed:', uploadError);
-        // Still saved locally, will retry next time
-      }
-    }
-    
+    await exportBackupToJsonConsistent();
     setLastBackupAt(Date.now());
   } catch (e) {
     console.error('Auto-backup failed:', e);
@@ -106,12 +120,46 @@ export async function importBackupFromJson(uri: string): Promise<BackupData> {
   const content = await readAsStringAsync(uri, {
     encoding: EncodingType.UTF8,
   });
-  
+
   const data: BackupData = JSON.parse(content);
-  
+
   if (!data.version || !Array.isArray(data.groups)) {
     throw new Error('Invalid backup file format');
   }
-  
+
   return data;
+}
+
+// Restore backup data to the app
+export async function restoreBackup(data: BackupData): Promise<number> {
+  const { addGroup } = useBpStore.getState();
+
+  // Clear all existing data directly via DB (no store limit)
+  await deleteAllGroups();
+
+  // Restore groups
+  let restoredCount = 0;
+  for (const group of data.groups) {
+    await addGroup({
+      arm: group.arm,
+      note: group.note,
+      readings: group.readings,
+      createdAt: group.createdAt,
+    });
+    restoredCount++;
+  }
+  
+  return restoredCount;
+}
+
+// Pick a backup JSON file
+export async function pickBackupFile(): Promise<string | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: 'application/json',
+    copyToCacheDirectory: true,
+  });
+  
+  if (result.canceled || !result.assets?.length) return null;
+  
+  return result.assets[0].uri;
 }

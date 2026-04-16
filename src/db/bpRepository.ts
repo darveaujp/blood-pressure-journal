@@ -4,6 +4,7 @@ import { uuidv4 } from '../utils/uuid';
 
 export async function initDb() {
   await execAsync('PRAGMA journal_mode = WAL;');
+  await execAsync('PRAGMA foreign_keys = ON;');
   await execAsync(
     `CREATE TABLE IF NOT EXISTS bp_groups (
       id TEXT PRIMARY KEY NOT NULL,
@@ -216,6 +217,28 @@ export async function updateGroup(params: {
     await execAsync('ROLLBACK;').catch(() => undefined);
     throw e;
   }
+}
+
+export async function listAllGroups(): Promise<BpGroup[]> {
+  const rows = await queryAllAsync<any>(
+    'SELECT id, created_at, arm, note, avg_systolic, avg_diastolic, avg_pulse, count FROM bp_groups ORDER BY created_at DESC;'
+  );
+
+  return rows.map((r) => ({
+    id: String(r.id),
+    createdAt: Number(r.created_at),
+    arm: (r.arm === 'right' ? 'right' : 'left') as Arm,
+    note: r.note ?? null,
+    avgSystolic: Number(r.avg_systolic),
+    avgDiastolic: Number(r.avg_diastolic),
+    avgPulse: r.avg_pulse === null || r.avg_pulse === undefined ? null : Number(r.avg_pulse),
+    count: Number(r.count),
+  }));
+}
+
+export async function deleteAllGroups(): Promise<void> {
+  await execAsync('DELETE FROM bp_readings;');
+  await execAsync('DELETE FROM bp_groups;');
 }
 
 export async function listGroupsInRange(params: {

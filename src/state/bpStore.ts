@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 import type { Arm, BpGroup, BpReadingInput } from '../types/bp';
 import type { BpGroupWithReadings } from '../types/bp';
-import { createGroup, deleteGroup, getGroupWithReadings, initDb, listGroups, updateGroup, updateGroupMeta } from '../db/bpRepository';
+import { createGroup, deleteGroup, deleteAllGroups, getGroupWithReadings, initDb, listGroups, updateGroup, updateGroupMeta } from '../db/bpRepository';
 import { autoBackupIfEnabled } from '../services/backupService';
 
 type BpState = {
@@ -18,6 +18,7 @@ type BpState = {
     createdAt: number;
   }) => Promise<void>;
   removeGroup: (groupId: string) => Promise<void>;
+  clearAllGroups: () => Promise<void>;
   editGroupMeta: (params: { id: string; createdAt: number; arm: Arm; note: string | null }) => Promise<void>;
   editGroup: (params: {
     id: string;
@@ -58,6 +59,11 @@ export const useBpStore = create<BpState>((set, get) => ({
     await deleteGroup(groupId);
     await get().refresh();
     await autoBackupIfEnabled();
+  },
+
+  clearAllGroups: async () => {
+    await deleteAllGroups();
+    await get().refresh();
   },
 
   editGroupMeta: async ({ id, createdAt, arm, note }) => {
