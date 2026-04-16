@@ -1,0 +1,12 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="224" fill="#0B1220"/>
+  <!-- Ring -->
+  <circle cx="512" cy="512" r="300" stroke="#60A5FA" stroke-width="90"/>
+
+  <!-- Pulse line -->
+  <path d="M260 512 L360 512 L410 450 L460 610 L525 410 L590 512 L700 512" 
+        stroke="#60A5FA" stroke-width="90" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Green accent dot -->
+  <circle cx="732" cy="512" r="60" fill="#22C55E"/>
+</svg>

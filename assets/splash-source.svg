@@ -1,0 +1,13 @@
+<svg width="2048" height="2048" viewBox="0 0 2048 2048" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Centered mark; transparent background. Splash background is set in app.json -->
+
+  <!-- Ring -->
+  <circle cx="1024" cy="1024" r="400" stroke="#60A5FA" stroke-width="120"/>
+
+  <!-- Pulse line -->
+  <path d="M690 1024 L820 1024 L890 940 L960 1215 L1060 820 L1160 1024 L1340 1024" 
+        stroke="#60A5FA" stroke-width="120" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Green accent dot -->
+  <circle cx="1395" cy="1024" r="80" fill="#22C55E"/>
+</svg>
